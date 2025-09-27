@@ -19,7 +19,8 @@ class llm_communication:
         self.message_history: List[Dict[str, Any]] = []
         self.message_retention_minutes = message_retention_minutes
         self.current_stage = 0
-        
+        self.off_topic_count = 0
+        self.max_off_topic = 2
         # Grounding exercise prompts
         self.grounding_prompts = [
             # Calm Opener
@@ -147,6 +148,97 @@ class llm_communication:
     def process_grounding_exercise(self, user_message: str, timestamp: float = None) -> str:
         """Process user input through the grounding exercise pipeline."""
         try:
+            
+            #
+            #
+            #
+            last_llm_message = "N/A"
+            if self.current_stage != 0:
+                last_llm_message = self.grounding_prompts[self.current_stage - 1]
+            current_step_message = self.grounding_prompts[self.current_stage]
+
+            '''og prompt = f"""You are a calm therapist guiding a user through a 5-4-3-2-1 grounding exercise for anxiety. 
+You must decide whether the user is ready to move on to the next step, or whether they want to stay in this step and talk more.
+
+Here is the conversation state:
+
+- Last grounding step: "{last_llm_message}"
+- User’s reply: "{user_message}"
+- Current grounding step prompt: "{current_step_message}"
+
+Rules:
+1. If the user clearly followed the instruction (e.g., listed the correct number of things, or engaged with the exercise), respond with "READY:" and THEN directly provide the **next step’s grounding prompt** in a calm, natural way.
+2. If the user seems distracted, panicked, or asking for repetition, respond with "HOLD:" and THEN provide a short, empathetic response that responds to their concerns and tries to kindly and patiently be there for them.
+3. Your response after "READY:" or "HOLD:" must always be no more than 2 calm, supportive sentences.
+
+Format:
+- Start with either "READY:" or "HOLD:" (nothing else before it).
+- After that, include your message for the user.
+"""'''
+            
+            prompt = f"""You are a calm, caring therapist guiding a user through a 5-4-3-2-1 grounding exercise for anxiety.  
+Your role is not just to move through steps, but to be a supportive companion who listens patiently and helps the user feel understood.  
+
+Here is the conversation state:
+
+- Last grounding step: "{last_llm_message}"
+- User’s reply: "{user_message}"
+- Current grounding step prompt: "{current_step_message}"
+
+Rules:
+1. If the user clearly followed the instruction (e.g., listed the correct number of things, or engaged with the exercise), respond with "READY:" and THEN gently introduce the **next step’s grounding prompt** in a calm, natural way.  
+2. If the user seems distracted, panicked, venting, or going off-topic, respond with "HOLD:" and provide a short, empathetic response that:  
+   - Validates their feelings or acknowledges what they said,  
+   - Reassures them they are safe talking to you,  
+   - And keeps them gently connected to the grounding process without pushing.  
+3. Your response after "READY:" or "HOLD:" should be no more than 2 supportive sentences. Keep the tone warm, kind, and human.  
+4. Never sound like you are rushing or checking boxes — your priority is to make the user feel heard and cared for, even if they are off-topic.  
+
+Format:  
+- Start with either "READY:" or "HOLD:" (nothing else before it).  
+- After that, include your message for the user.  
+"""
+            if self.off_topic_count >= self.max_off_topic:
+                self.off_topic_count = 0
+                # Gently segue
+                prompt = f"""You are a calm and supportive companion.  
+The user may have been chatting off-topic or staying in the current step for a while, but now you must gently and smoothly guide them forward without making them feel rushed.  
+
+Here is the conversation state:
+
+- Last assistant message: "{last_llm_message}"
+- User’s reply: "{user_message}"
+- Current step message: "{current_step_message}"
+
+Rules:
+1. Always respond with "READY:" followed by a warm, natural transition that briefly acknowledges what the user said and gently reconnects them to the exercise.  
+2. After your transition, immediately provide the {current_step_message}.  
+3. The transition should feel kind and conversational, not scripted or mechanical. Use no more than 2 short sentences before moving into the step.  
+4. Your priority is to sound supportive and patient — like a friend who cares — while still keeping the grounding exercise moving forward.  
+
+Format:  
+- Start with "READY:" (nothing else before it).  
+- After that, include your gentle transition + the {current_step_message}.  
+"""
+                '''og prompt = f"""You are a calm and supportive guide.  
+The user may have been chatting off-topic or staying in the current step for a while, but now you must gently and smoothly segue them forward.  
+
+Here is the conversation state:
+
+- Last assistant message: "{last_llm_message}"
+- User’s reply: "{user_message}"
+- Current step message: "{current_step_message}"
+
+Rules:
+1. Always respond with "READY:" followed by a short, natural, and gentle transition that acknowledges the conversation and calmly brings the user back on track.
+2. After your gentle transition, immediately provide the {current_step_message}.
+3. Your transition + step delivery must feel conversational, not robotic or scripted, and should not exceed 2 sentences before moving into the step.
+
+Format:
+- Start with "READY:" (nothing else before it).
+- After that, include your gentle transition + the {current_step_message}.
+"""'''
+            
             # Safety clamp on stage index
             if self.current_stage < 0:
                 self.current_stage = 0
@@ -157,33 +249,46 @@ class llm_communication:
 
             # --- Stage Logic ---
             if self.current_stage == 0:  # Calm opener
+                #FIXME make intro logic here alex
                 response = self._generate_grounding_response(base_prompt, user_message)
                 self._advance_stage()
 
             elif self.current_stage == 1:  # Visual step with OD pipeline
                 detected_objects = self._get_scene_objects()  # TODO: hook into OD service
+                #FIXME make OD be joined
                 if detected_objects:
                     base_prompt = base_prompt.replace(
                         "[OD pipeline inserts detections here]",
                         ", ".join(detected_objects)
                     )
-                response = self._generate_grounding_response(base_prompt, user_message)
+                #response = self._generate_grounding_response(base_prompt, user_message)
+                response = self.openai_prompt(prompt=prompt)
                 self._advance_stage()
 
             elif 2 <= self.current_stage <= 5:  # Touch, Hear, Smell, Taste
-                response = self._generate_grounding_response(base_prompt, user_message)
+                #response = self._generate_grounding_response(base_prompt, user_message)
+                response = self.openai_prompt(prompt=prompt)
                 self._advance_stage()
 
             elif self.current_stage == 6:  # Closure
-                response = self._generate_grounding_response(base_prompt, user_message)
-
-                if any(word in user_message.lower() for word in ["continue", "again", "yes", "more", "another"]):
+                #response = self._generate_grounding_response(base_prompt, user_message)
+                response = self.openai_prompt(prompt=prompt)
+                if any(word in user_message.lower() for word in ["continue", "again", "more", "another", "repeat"]):
                     self.reset_exercise()
                     response += " Let's start fresh with another grounding exercise."
 
             else:
                 response = "I'm here to help you through this grounding exercise. Let's take it step by step."
 
+
+            if response.startswith("HOLD:"):
+                response = response[5:]
+                self.off_topic_count += 1
+                
+            if response.startswith("READY:"):
+                response = response[6:]
+                self.off_topic_count = 0
+            
             # Log interaction
             self.log_message(user_message, response, timestamp=timestamp)
             return response
