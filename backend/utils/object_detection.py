@@ -228,20 +228,57 @@ class object_detection:
             }
     
     
-    def count_objects_from_results(self,list_of_results):
-        # each result within the result list
-            # boxes --> detected bounding boxes
-            # masks --> segmentation masks
-            # probs --> probabilities of classificatino
-            # orig_img --> numpy array
-            # names --> dictionary mapping, 0-> "Person"
-            # plot, show --> display/annotate image
+    def count_objects_from_results(self, result_obj):
+        """
+        Extracts detected objects with details:
+        - class name
+        - bounding box center (x, y)
+        - bounding box width and height
 
-        list_of_object_IDs = result.boxes.cls  # list of predicted/identified objects
-        index_to_name = result.names # index -> obj_type name
-        obj_names = [ index_to_name[int(c)] for c in index_to_name]
+        Args:
+            result_obj: YOLOv8 Results object (results[0] from model inference).
 
-        result = {}
-        for obj_ID in list_of_object_IDs: # for each classified object in the list of resulting identified objects
-            name = index_to_name[obj_ID]
-            result[name] = result.get(name, 0) + 1
+        Returns:
+            A list of dictionaries, each containing: each entry is the object
+            {
+                "class": str,
+                "center": (float, float),
+                "width": float,
+                "height": float
+            }
+        """
+        objects_data = []
+
+        class_id_to_name = result_obj.names               # mapping from ID -> class name {0: person, 1: dog}
+        boxes = result_obj.boxes.xyxy                    # tensor of bounding boxes [x1, y1, x2, y2]
+        class_ids = result_obj.boxes.cls                 # tensor of class IDs
+
+        for i, class_id in enumerate(class_ids):
+            class_name = class_id_to_name[int(class_id)]
+            x1, y1, x2, y2 = boxes[i]
+
+            # Compute center
+            x_center = (x1 + x2) / 2
+            y_center = (y1 + y2) / 2
+
+            # Compute width and height
+            width = x2 - x1
+            height = y2 - y1
+
+            objects_data.append({
+                "class": class_name,
+                "center": (x_center.item(), y_center.item()),
+                "box_width": width.item(),
+                "box_height": height.item()
+            })
+
+        confidences = result_obj.boxes.conf
+        CONFIDENCE_THRESHOLD = 0.5
+        objects_data_over_confidence = []     
+        for objects in objects_data:
+            if confidences[i].item()  >= CONFIDENCE_THRESHOLD:
+                objects_data_over_confidence.append(objects)
+
+           
+        return objects_data_over_confidence
+
