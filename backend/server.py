@@ -11,30 +11,14 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/process_frame")
-async def process_frame(file: UploadFile = File(...)):
-    # 1. Read file
-    image_bytes = await file.read()
+@app.post("/upload_image")
+async def process_frame():
+    pass
 
-    # 2. TODO: Run object detection
-    # Replace this stub with YOLO inference
-    objects_detected = ["tree", "car"]  # fake result for now
-    boxes = [[50, 50, 200, 200]]        # fake bounding box
+@app.post("/upload_text")
+async def process_frame():
+    pass
 
-    # 3. TODO: Build prompt + call LLM
-    # Replace with real API call later
-    if objects_detected:
-        prompt_text = f"I see some {objects_detected[0]}s. Can you count them?"
-    else:
-        prompt_text = "Can you take a deep breath and notice three things around you?"
-
-    # 4. TODO: (Optional) Call TTS
-    # Return text only for now
-    return {
-        "prompt_text": prompt_text,
-        "objects_detected": objects_detected,
-        "boxes": boxes
-    }
 
 
 # ----------------------------
