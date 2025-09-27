@@ -13,10 +13,9 @@ def health():
 
 @app.post("/upload_image")
 async def process_frame(data: ImageMessageData):
-    
+    pass
 
 @app.post("/upload_text")
-
 async def process_text(data: TextMessageData):
     text = data.text
     heart_rate = data.heart_rate
