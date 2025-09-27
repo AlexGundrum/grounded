@@ -3,7 +3,8 @@ import base64
 import io
 from typing import Optional
 from openai import OpenAI
-
+from dotenv import load_dotenv
+load_dotenv()
 class text_to_speech:
     def __init__(self):
         """
