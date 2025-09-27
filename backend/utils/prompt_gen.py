@@ -122,7 +122,7 @@ import time
 from openai import OpenAI
 
 def create_prompt(obj_list: list, step: int):
-    client = OpenAI(api_key="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")
+    client = OpenAI(api_key="placeholder")
     flat_props = [prop for _, _, props in obj_list for prop in props]
     chosen_attr = random.choice(flat_props) if flat_props else None
 
