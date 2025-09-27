@@ -14,11 +14,12 @@ class llm_communication:
     def __init__(self, message_retention_minutes: int = 30):
         self.previous_messages: List[str] = []
         self.gemini_model = "gemini-2.5-flash"
-        self.client = OpenAI(api_key=OpenAI.api_key)
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
         # New message logging system
         self.message_history: List[Dict[str, Any]] = []
         self.message_retention_minutes = message_retention_minutes
+        self.current_stage = 0
     
     # ------------------------
     # Message Logging System
@@ -88,7 +89,7 @@ class llm_communication:
     # OpenAI API call
     # ------------------------
     def openai_prompt(self, prompt: str, model: str = "gpt-4o-mini", include_history: bool = False) -> str:
-        messages = [{"role": "system", "content": "You are a calm, grounding therapist helping with anxiety."}]
+        messages = [{"role": "system", "content": "You are a calm, grounding therapist helping with anxiety. Respond in two sentences or less."}]
         
         # Include conversation history if requested
         if include_history:
