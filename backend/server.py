@@ -2,8 +2,9 @@ from fastapi import FastAPI
 # Assuming TextMessageData is in data_models.py (open on the right)
 from data_models import TextMessageData, ImageMessageData
 import uvicorn
-from utils import * 
-from utils import str_to_pic
+#from utils import * 
+#from utils import str_to_pic
+from utils import llm_communication
 
 app = FastAPI()
 
@@ -15,14 +16,20 @@ def health():
 
 @app.post("/upload_image")
 async def process_frame(data: ImageMessageData):
-    str_to_pic.str_to_pic(data.image)
+    pass
 
-
+com = llm_communication()
 @app.post("/upload_text")
 async def process_text(data: TextMessageData):
     text = data.text
     heart_rate = data.heart_rate
     timestamp = data.timestamp
+
+    response = com.new_message_protocol(text)
+    print(f"input: {text}")
+    print(f"RESPONSE: {response}")
+    return {"status": "success",
+            "message" : response}
 
     if heart_rate > 100:
         print(f"CRITICAL: High heart rate detected ({heart_rate} bpm)!")
