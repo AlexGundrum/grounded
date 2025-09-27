@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from data_models import TextMessageData, ImageMessageData
 import uvicorn
 from utils import * 
+from utils import str_to_pic
+
 app = FastAPI()
 
 @app.get("/health")
@@ -13,7 +15,8 @@ def health():
 
 @app.post("/upload_image")
 async def process_frame(data: ImageMessageData):
-    pass
+    str_to_pic.str_to_pic(data.image)
+
 
 @app.post("/upload_text")
 async def process_text(data: TextMessageData):
