@@ -9,11 +9,7 @@ from typing import Dict, Tuple
 from utils import llm_communication
 
 from utils.object_detection import object_detection
-# ZACH IMPORTED THESE FOR "detect_object_data_from_photo()"
-import cv2
-import numpy as np
-from ultralytics import YOLO
-from fastapi import UploadFile, File
+
 
 
 
@@ -432,56 +428,24 @@ async def process_audio_file(file_path: str):
             "audio_data": None,
             "message": "Audio file processing error"
         }
+    
+detector = object_detection(model_name="yolov8n.pt")
 frame_counter = 0
 @app.put("/detection/image_qualities")
-async def detect_object_data_from_photo(file: UploadFile = File(...)):
+async def detect_object_data_from_photo(data: ImageMessageData):
     global frame_counter
     frame_counter +=1
 
+    
+    
     start_time = time.time()
-    # FILE --> NpArr --> openCvIMG
-    contents = await file.read()
-    np_arr = np.frombuffer(contents, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    if img is None:
-        return {"status": "error", "message": "Invalid image file"}
-
-    # Run YOLO detection
-    detector = object_detection(model_name="yolov8n.pt")
-    results = detector.apply_object_detection(img)
-
-    objects_unformatted = detector.get_objects_from_results_for_kori(results[0])
-    
-    processing_time = round(time.time() - start_time,3) # rounds to 3 digits
+    image_string = data.image
+    results = detector.apply_object_detection(image_string) 
+    formatted_results = detector.get_objects_from_results_for_kori(results[0], frame_counter,start_time,confidence_threshold= 0.5) 
+    detector.last_objects_identified = formatted_results
+    return formatted_results
     # Convert to Kori's desired format
-    detections = []
-    for obj in objects_unformatted:
-        # Here, normalize center coordinates relative to image size (0-1)
-        
-                # "class": class_name,
-                # "center": (x_center.item(), y_center.item()),
-                # "box_width": width.item(),
-                # "box_height": height.item(),
-               
-                # "confidence": confidence
-        class_id = list(detector.coco_classes.keys())[list(detector.coco_classes.values()).index(obj["class"])]
-        center_x = int(obj["center"][0])
-        center_y = int(obj["center"][1])
-        confidence = round(obj.get("confidence", 0.0), 3)
-        
-
-        detections.append({
-            "class_id": class_id,
-            "box_x":center_x,
-            "box_y": center_y,
-            "confidence": confidence,
-            "processing_time": processing_time,
-            "frame_id": frame_counter,
-            "status": "success"
-        })
     
-    return {"objects": detections}
     #file uploaded is an image
 
 
