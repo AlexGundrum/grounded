@@ -7,26 +7,69 @@ class object_detection:
     def __init__(self, model_path="yolov8n.pt"):
         self.model = YOLO(model_path)
 
-    def apply_object_detection(self):
-        results = self.model("backend/utils/puppy.jpg") # results type = ultralytics.engine.results.Results
+    def apply_object_detection(self,image_path):
+
+        results = self.model(image_path) # results type = ultralytics.engine.results.Results
         return results
-    def count_objects_from_results(self,list_of_results):
-        # each result within the result list
-            # boxes --> detected bounding boxes
-            # masks --> segmentation masks
-            # probs --> probabilities of classificatino
-            # orig_img --> numpy array
-            # names --> dictionary mapping, 0-> "Person"
-            # plot, show --> display/annotate image
+    
+    
+    def find_centers_of_class(self, result_obj, target_class: str) -> list[tuple[float, float]]:
+        '''
+            EXAMPLE CLASS NAMES:
+            person
+            laptop
+            bottle
+            cup
+            mouse
+            dining table
 
-        list_of_object_IDs = result.boxes.cls  # list of predicted/identified objects
-        index_to_name = result.names # index -> obj_type name
-        obj_names = [ index_to_name[int(c)] for c in index_to_name]
+        '''
+        """
+        Find the center coordinates of all detected objects of a specified class.
 
-        result = {}
-        for obj_ID in list_of_object_IDs: # for each classified object in the list of resulting identified objects
-            name = index_to_name[obj_ID]
-            result[name] = result.get(name, 0) + 1
+        Args:
+            result_obj: YOLOv8 Results object containing detections.
+            target_class: Name of the object class to search for (e.g., "person", "dog").
 
-            
-        return result
+        Returns:
+            A list of (x_center, y_center) tuples for each detected object of the target class.
+        """
+        centers = []  # list to store center coordinates
+        class_id_to_name = result_obj.names  # mapping from class IDs to class names
+        bounding_boxes = result_obj.boxes.xyxy  # bounding boxes in format [x1, y1, x2, y2]
+
+        for i, class_id in enumerate(result_obj.boxes.cls):
+            class_name = class_id_to_name[int(class_id)]  # convert class ID to name
+            if class_name == target_class:
+                x1, y1, x2, y2 = bounding_boxes[i]
+                x_center = (x1 + x2) / 2
+                y_center = (y1 + y2) / 2
+                centers.append((x_center.item(), y_center.item()))  # convert tensor to float
+
+        return centers
+
+
+if __name__ == "__main__":
+    # Import your class (or assume it's in the same file)
+    # from your_module import object_detection
+
+    # Initialize the detector with the YOLOv8n model
+    detector = object_detection()
+
+    # Run object detection on an image
+    image_path = "backend/utils/practice_data.jpg"  # change this to your image path
+    results = detector.apply_object_detection(image_path)
+
+    # YOLOv8 returns a list of Results; we'll use the first one
+    result_obj = results[0]
+
+    # Find centers of all detected "person" objects
+    person_centers = detector.find_centers_of_class(result_obj, "person")
+
+    # Print the results
+    if person_centers:
+        print(f"Found {len(person_centers)} person(s) at centers:")
+        for idx, (x, y) in enumerate(person_centers, start=1):
+            print(f"Person {idx}: (x={x:.2f}, y={y:.2f})")
+    else:
+        print("No persons detected in the image.")
