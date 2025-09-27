@@ -435,8 +435,6 @@ frame_counter = 0
 async def detect_object_data_from_photo(data: ImageMessageData):
     global frame_counter
     frame_counter +=1
-
-    
     
     start_time = time.time()
     image_string = data.image
