@@ -226,3 +226,22 @@ class object_detection:
                 "detected_objects": [],
                 "total_objects": 0
             }
+    
+    
+    def count_objects_from_results(self,list_of_results):
+        # each result within the result list
+            # boxes --> detected bounding boxes
+            # masks --> segmentation masks
+            # probs --> probabilities of classificatino
+            # orig_img --> numpy array
+            # names --> dictionary mapping, 0-> "Person"
+            # plot, show --> display/annotate image
+
+        list_of_object_IDs = result.boxes.cls  # list of predicted/identified objects
+        index_to_name = result.names # index -> obj_type name
+        obj_names = [ index_to_name[int(c)] for c in index_to_name]
+
+        result = {}
+        for obj_ID in list_of_object_IDs: # for each classified object in the list of resulting identified objects
+            name = index_to_name[obj_ID]
+            result[name] = result.get(name, 0) + 1
