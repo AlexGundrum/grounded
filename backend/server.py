@@ -1,8 +1,13 @@
-# server.py
-from fastapi import FastAPI, UploadFile, File
-from pydantic import BaseModel
-from typing import List
+from fastapi import FastAPI,UploadFile,File
+# Assuming TextMessageData is in data_models.py (open on the right)
+from data_models import TextMessageData, ImageMessageData
 import uvicorn
+from utils.str_to_pic import str_to_pic
+from fastapi.responses import FileResponse, Response
+import os
+#from utils import * 
+#from utils import str_to_pic
+from utils import llm_communication
 
 app = FastAPI()
 
@@ -31,9 +36,8 @@ async def process_frame(file: UploadFile = File(...)):
     # 4. TODO: (Optional) Call TTS
     # Return text only for now
     return {
-        "prompt_text": prompt_text,
-        "objects_detected": objects_detected,
-        "boxes": boxes
+        "status": "success", 
+        "message": f"TTS is confirmed to speak the text: {text}"
     }
 
 
