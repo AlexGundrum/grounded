@@ -1,39 +1,47 @@
-# server.py
-from fastapi import FastAPI, UploadFile, File
-from pydantic import BaseModel
-from typing import List
+from fastapi import FastAPI
+# Assuming TextMessageData is in data_models.py (open on the right)
+from data_models import TextMessageData, ImageMessageData
 import uvicorn
+#from utils import * 
+#from utils import str_to_pic
+from utils import llm_communication
 
 app = FastAPI()
 
 @app.get("/health")
 def health():
+    """Simple endpoint to confirm the server is running."""
     return {"status": "ok"}
 
 
-@app.post("/process_frame")
-async def process_frame(file: UploadFile = File(...)):
-    # 1. Read file
-    image_bytes = await file.read()
+@app.post("/upload_image")
+async def process_frame(data: ImageMessageData):
+    pass
 
-    # 2. TODO: Run object detection
-    # Replace this stub with YOLO inference
-    objects_detected = ["tree", "car"]  # fake result for now
-    boxes = [[50, 50, 200, 200]]        # fake bounding box
+com = llm_communication()
+@app.post("/upload_text")
+async def process_text(data: TextMessageData):
+    text = data.text
+    heart_rate = data.heart_rate
+    timestamp = data.timestamp
 
-    # 3. TODO: Build prompt + call LLM
-    # Replace with real API call later
-    if objects_detected:
-        prompt_text = f"I see some {objects_detected[0]}s. Can you count them?"
-    else:
-        prompt_text = "Can you take a deep breath and notice three things around you?"
+    response = com.new_message_protocol(text)
+    print(f"input: {text}")
+    print(f"RESPONSE: {response}")
+    return {"status": "success",
+            "message" : response}
 
-    # 4. TODO: (Optional) Call TTS
-    # Return text only for now
+    if heart_rate > 100:
+        print(f"CRITICAL: High heart rate detected ({heart_rate} bpm)!")
+
+    print(f"--- Received Log Entry ---")
+    print(f"Text: {text}")
+    print(f"HR: {heart_rate} | Timestamp: {timestamp}")
+    print(f"--------------------------")
+    
     return {
-        "prompt_text": prompt_text,
-        "objects_detected": objects_detected,
-        "boxes": boxes
+        "status": "success", 
+        "message": f"TTS is confirmed to speak the text: {text}"
     }
 
 
@@ -41,4 +49,5 @@ async def process_frame(file: UploadFile = File(...)):
 # Run server
 # ----------------------------
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    # Note: 'server:app' tells uvicorn to look for the 'app' variable in 'server.py'
+    uvicorn.run("server:app", host="0.0.0.0", port=2419, reload=True)
