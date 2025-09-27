@@ -1,33 +1,54 @@
 # llm_service.py
 import os
+import random
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from openai import OpenAI
+from dotenv import load_dotenv
 
 import google.generativeai as genai
-
+load_dotenv()
 # Load keys
 OpenAI.api_key = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 genai.api_key = os.getenv("GOOGLE_API_KEY")
 
 class llm_communication:
     def __init__(self, message_retention_minutes: int = 30):
-        self.previous_messages: List[str] = []
-        self.gemini_model = "gemini-2.5-flash"
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
-        # New message logging system
+        self.client = OpenAI(api_key=OPENAI_API_KEY)
         self.message_history: List[Dict[str, Any]] = []
         self.message_retention_minutes = message_retention_minutes
         self.current_stage = 0
+        
+        # Grounding exercise prompts
+        self.grounding_prompts = [
+            # Calm Opener
+            "Take a slow breath in... and a gentle breath out. You're safe here. Everything will be okay. Let's move through this together, step by step.",
+
+            # Step 1: See 5 things
+            "Let's start with your surroundings. Look around you and notice five things you can see. From your scene, I notice a few objects: [OD pipeline inserts detections here]. What are five things you can see right now?",
+
+            # Step 2: Touch 4 things
+            "Now, gently shift your attention to touch. Notice four things you can physically feel—maybe the ground under your feet, the fabric of your clothing, or the surface beneath your hands. What four things can you touch? ",
+
+            # Step 3: Hear 3 things
+            "Next, let's listen. Take a moment and notice three sounds around you. They might be loud or very quiet. What three things can you hear right now?",
+
+            # Step 4: Smell 2 things
+            "Now, bring your awareness to your sense of smell. Notice two things you can smell in this moment. If nothing stands out, think of two scents you enjoy. What are two things you can smell?",
+
+            # Step 5: Taste 1 thing
+            "Finally, let's focus on taste. Notice one thing you can taste right now. Maybe it's a lingering flavor or simply the freshness of your breath. What is one thing you can taste?",
+
+            # Gentle Closure
+            "You've just guided yourself through all five steps. Well done. Take a moment to notice how you feel now. Would you like to continue with another round, or pause here?"
+        ]
     
     # ------------------------
     # Message Logging System
     # ------------------------
-    def log_message(self, user_message: str, llm_response: str, heart_rate: float = None, timestamp: float = None) -> None:
-        """
-        Log a conversation exchange with timestamp and metadata.
-        """
+    def log_message(self, user_message: str, llm_response: str, timestamp: float = None) -> None:
+        """Log a conversation exchange with timestamp."""
         if timestamp is None:
             timestamp = datetime.now().timestamp()
         
@@ -35,55 +56,34 @@ class llm_communication:
             "timestamp": timestamp,
             "datetime": datetime.fromtimestamp(timestamp),
             "user_message": user_message,
-            "llm_response": llm_response,
-            "heart_rate": heart_rate
+            "llm_response": llm_response
         }
         
         self.message_history.append(message_entry)
         self._cleanup_old_messages()
     
     def _cleanup_old_messages(self) -> None:
-        """
-        Remove messages older than the retention period.
-        """
+        """Remove messages older than the retention period."""
         cutoff_time = datetime.now() - timedelta(minutes=self.message_retention_minutes)
         self.message_history = [
             msg for msg in self.message_history 
             if msg["datetime"] > cutoff_time
         ]
     
-    def get_recent_conversation_history(self, max_messages: int = 10) -> List[Dict[str, Any]]:
-        """
-        Get the most recent conversation history within the retention period.
-        """
-        self._cleanup_old_messages()
-        return self.message_history[-max_messages:] if max_messages > 0 else self.message_history
-    
     def format_conversation_for_context(self, max_messages: int = 5) -> str:
-        """
-        Format recent conversation history as context for LLM calls.
-        """
-        recent_history = self.get_recent_conversation_history(max_messages)
+        """Format recent conversation history as context for LLM calls."""
+        self._cleanup_old_messages()
+        recent_history = self.message_history[-max_messages:] if max_messages > 0 else self.message_history
         
         if not recent_history:
             return ""
         
         context_parts = ["Recent conversation history:"]
         for msg in recent_history:
-            hr_info = f" (HR: {msg['heart_rate']})" if msg.get('heart_rate') else ""
-            context_parts.append(f"User: {msg['user_message']}{hr_info}")
+            context_parts.append(f"User: {msg['user_message']}")
             context_parts.append(f"Assistant: {msg['llm_response']}")
         
         return "\n".join(context_parts)
-    # ------------------------
-    # Gemini API call
-    # ------------------------
-    def ask_gemini(self, prompt: str) -> str:
-        response = genai.models.generate_content(
-            model=self.gemini_model,
-            contents=prompt
-        )
-        return response.text
 
     # ------------------------
     # OpenAI API call
@@ -106,22 +106,11 @@ class llm_communication:
         return response.choices[0].message.content
 
     # ------------------------
-    # Basic talking test
-    # ------------------------
-    def basic_talking_test(self, message: str) -> str:
-        ADAPTIVE_COACH_PROMPT = f"""
-        Message received: {message}
-        Respond in a calm, grounding way for anxiety. Respond in two sentences or less
-        """
-        response = self.openai_prompt(ADAPTIVE_COACH_PROMPT)
-        return response
-
-    # ------------------------
     # Enhanced Communication Pipeline
     # ------------------------
-    def enhanced_message_pipeline(self, user_message: str, heart_rate: float = None, timestamp: float = None) -> str:
+    def enhanced_message_pipeline(self, user_message: str, timestamp: float = None) -> str:
         """
-        New comprehensive message processing pipeline with conversation history.
+        Enhanced message processing pipeline with conversation history.
         This is the main entry point for processing user messages.
         """
         # Get conversation context
@@ -148,56 +137,102 @@ class llm_communication:
         response = self.openai_prompt(enhanced_prompt, include_history=True)
         
         # Log the conversation exchange
-        self.log_message(user_message, response, heart_rate, timestamp)
+        self.log_message(user_message, response, timestamp=timestamp)
         
         return response
     
     # ------------------------
-    # Legacy Functions (Preserved)
+    # Grounding Exercise Pipeline
     # ------------------------
-    def new_message_protocol(self, user_message: str) -> str:
-        """
-        Legacy function - now uses the enhanced pipeline internally.
-        Maintained for backward compatibility.
-        """
-        self.previous_messages.append(user_message)
-        response = self.enhanced_message_pipeline(user_message)
-        return response
-    
-    # ------------------------
-    # Additional Utility Functions
-    # ------------------------
-    def get_conversation_stats(self) -> Dict[str, Any]:
-        """
-        Get statistics about the current conversation history.
-        """
-        self._cleanup_old_messages()
+    def process_grounding_exercise(self, user_message: str, timestamp: float = None) -> str:
+        """Process user input through the grounding exercise pipeline."""
+        try:
+            # Safety clamp on stage index
+            if self.current_stage < 0:
+                self.current_stage = 0
+            elif self.current_stage >= len(self.grounding_prompts):
+                self.current_stage = len(self.grounding_prompts) - 1
+            
+            base_prompt = self.grounding_prompts[self.current_stage]
+
+            # --- Stage Logic ---
+            if self.current_stage == 0:  # Calm opener
+                response = self._generate_grounding_response(base_prompt, user_message)
+                self._advance_stage()
+
+            elif self.current_stage == 1:  # Visual step with OD pipeline
+                detected_objects = self._get_scene_objects()  # TODO: hook into OD service
+                if detected_objects:
+                    base_prompt = base_prompt.replace(
+                        "[OD pipeline inserts detections here]",
+                        ", ".join(detected_objects)
+                    )
+                response = self._generate_grounding_response(base_prompt, user_message)
+                self._advance_stage()
+
+            elif 2 <= self.current_stage <= 5:  # Touch, Hear, Smell, Taste
+                response = self._generate_grounding_response(base_prompt, user_message)
+                self._advance_stage()
+
+            elif self.current_stage == 6:  # Closure
+                response = self._generate_grounding_response(base_prompt, user_message)
+
+                if any(word in user_message.lower() for word in ["continue", "again", "yes", "more", "another"]):
+                    self.reset_exercise()
+                    response += " Let's start fresh with another grounding exercise."
+
+            else:
+                response = "I'm here to help you through this grounding exercise. Let's take it step by step."
+
+            # Log interaction
+            self.log_message(user_message, response, timestamp=timestamp)
+            return response
         
-        if not self.message_history:
-            return {
-                "total_messages": 0,
-                "retention_period_minutes": self.message_retention_minutes,
-                "oldest_message": None,
-                "newest_message": None
-            }
-        
-        return {
-            "total_messages": len(self.message_history),
-            "retention_period_minutes": self.message_retention_minutes,
-            "oldest_message": self.message_history[0]["datetime"].isoformat(),
-            "newest_message": self.message_history[-1]["datetime"].isoformat()
-        }
-    
-    def clear_conversation_history(self) -> None:
-        """
-        Clear all conversation history.
-        """
-        self.message_history.clear()
-        self.previous_messages.clear()
-    
-    def set_retention_period(self, minutes: int) -> None:
-        """
-        Update the message retention period.
-        """
-        self.message_retention_minutes = minutes
-        self._cleanup_old_messages()
+        except Exception as e:
+            print(f"Error in grounding exercise pipeline: {e}")
+            return "I'm here to help you through this. Let's take a gentle breath together and try again. You're doing great."
+
+    def _generate_grounding_response(self, base_prompt: str, user_message: str) -> str:
+        """Generate a grounding response using the base prompt + user input."""
+        if not user_message.strip():
+            # Just use the base prompt if no user input
+            return self.openai_prompt(base_prompt, include_history=True)
+
+        # Short acknowledgment to avoid repetition
+        ack_templates = [
+            f"Thank you for sharing that. ",
+            f"I hear you. ",
+            f"That's a good observation. ",
+            f"Noted. ",
+            f"Great awareness. "
+        ]
+        ack = random.choice(ack_templates)
+
+        # Combine acknowledgment with grounding step
+        prompt = f"{base_prompt}\n\nThe user said: '{user_message}'. {ack}Guide them according to the grounding step."
+        return self.openai_prompt(prompt, include_history=True)
+
+    def _advance_stage(self):
+        """Advance to the next grounding stage, clamping to closure."""
+        self.current_stage += 1
+        if self.current_stage >= len(self.grounding_prompts):
+            self.current_stage = len(self.grounding_prompts) - 1
+
+    def reset_exercise(self):
+        """Reset to the opener stage (0)."""
+        self.current_stage = 0
+
+    def _get_scene_objects(self) -> List[str]:
+        """Hook into OD pipeline to return scene objects as a list of strings."""
+        # FIXME: Replace with actual OD service call
+        return ["lamp", "book", "chair"]
+
+    def get_current_grounding_step(self) -> int:
+        """Get the current grounding exercise step."""
+        return self.current_stage
+
+    def get_grounding_step_description(self) -> str:
+        """Get description of current grounding step."""
+        if 0 <= self.current_stage < len(self.grounding_prompts):
+            return self.grounding_prompts[self.current_stage]
+        return "Grounding exercise complete."

@@ -153,7 +153,7 @@ tts_service = text_to_speech()
 def set_therapy_stage_to_zero():
     com.current_stage = 0
 
-@app.post("/upload_text")
+@app.post("/upload_text") #FIXME we have client id and it doesn't get used.
 async def process_text(data: TextMessageData, client_id: str = Depends(rate_limit_check)):
     
     text = data.text
@@ -161,15 +161,21 @@ async def process_text(data: TextMessageData, client_id: str = Depends(rate_limi
     timestamp = data.timestamp
 
     # Use the new enhanced pipeline with conversation history
-    response = com.enhanced_message_pipeline(text, heart_rate, timestamp)
+    #response = com.enhanced_message_pipeline(text, timestamp)
     
+
+    #FIXME ALEX if there is a problem it is likely due to this lazy interchange im about to do 
+    response = com.process_grounding_exercise(text, timestamp)
+
+
+
     print(f"input: {text}")
     print(f"heart_rate: {heart_rate}")
     print(f"RESPONSE: {response}")
     
     # Log conversation stats for monitoring
-    stats = com.get_conversation_stats()
-    print(f"Conversation stats: {stats}")
+    #stats = com.get_conversation_stats()
+    #print(f"Conversation stats: {stats}")
     
     # Convert LLM response to speech using TTS
     try:
@@ -203,18 +209,6 @@ async def process_text(data: TextMessageData, client_id: str = Depends(rate_limi
             "message": response,
             "audio_base64": None
         }
-
-@app.get("/conversation/stats")
-async def get_conversation_stats():
-    """Get conversation statistics and history info."""
-    stats = com.get_conversation_stats()
-    return {"status": "success", "stats": stats}
-
-@app.post("/conversation/clear")
-async def clear_conversation():
-    """Clear all conversation history."""
-    com.clear_conversation_history()
-    return {"status": "success", "message": "Conversation history cleared"}
 
 @app.post("/conversation/retention")
 async def set_retention_period(minutes: int):
@@ -281,25 +275,6 @@ async def convert_text_to_speech(data: TTSRequestData):
             "error": str(e),
             "audio_data": None,
             "message": "TTS service error"
-        }
-
-@app.get("/tts/voices")
-async def get_available_voices():
-    """Get list of available TTS voices and their descriptions."""
-    try:
-        voices = tts_service.get_available_voices()
-        return {
-            "status": "success",
-            "voices": voices,
-            "default_voice": tts_service.default_voice,
-            "available_formats": tts_service.available_formats,
-            "default_format": tts_service.default_format
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "voices": {}
         }
 
 @app.post("/tts/grounding")
