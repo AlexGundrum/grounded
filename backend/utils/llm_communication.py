@@ -1,18 +1,17 @@
 from fastapi import FastAPI
 
-app = FastAPI()
 
 import os
 import google.generativeai as genai
 
 genai.api_key = os.getenv("GOOGLE_API_KEY")
 our_model = "gemini-2.5-flash"
-@app.post("/ask_gemAI")
-def ask_gemini(user_input: str, model: str = our_model) -> str:
+
+def ask_gemini(prompt: str, model: str = our_model) -> str:         # WILL NEED ANOTHER FUNCTION THAT GENERATES THE PROMPT THAT WE PASS HERE
    
     response = genai.models.generate_content(
         model=model,
-        contents=user_input
+        contents=prompt
     )
     return {"response" , response.text }
 
