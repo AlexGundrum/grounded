@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from ultralytics import YOLO
 import os
 from .str_to_pic import str_to_pic
+import time
 
 class object_detection:
     def __init__(self, model_name: str = "yolov8n.pt"):
@@ -44,8 +45,11 @@ class object_detection:
             'handbag', 'suitcase', 'potted plant', 'tree', 'flower'
         }
     
-    def apply_object_detection(self,image_path):
-        results = self.model(image_path) # results type = ultralytics.engine.results.Results
+        self.last_objects_identified = None
+    def apply_object_detection(self,image_str: str): #handles image casting and gets result obj
+        image_path = str_to_pic(image_str)
+        image = cv2.imread(image_path)
+        results = self.model(image_str) # results type = ultralytics.engine.results.Results
         return results
     
     def extract_dominant_color(self, image: np.ndarray, bbox: List[int]) -> str:
@@ -232,16 +236,21 @@ class object_detection:
             }
     
     
-    def get_objects_from_results_for_kori(self, result_obj, confidence_threshold: float = 0.5):
+    def get_objects_from_results_for_kori(self, result_obj, frame_count, start_time,confidence_threshold: float = 0.5):
         """
-        Extracts detected objects with details:
-        - class name
-        - bounding box center (x, y)
-        - bounding box width and height
-        - filters by confidence threshold
+        Extracts detected objects in the format:
+        {
+            "class_id": int,
+            "box_x": int,
+            "box_y": int,
+            "confidence": float,
+            "processing_time": float,
+            "frame_id": int,
+            "status": "success"
+        }
+        Only includes objects above the confidence threshold.
         """
-        objects_data = []
-
+        detections = []
         class_id_to_name = result_obj.names
         boxes = result_obj.boxes.xyxy
         class_ids = result_obj.boxes.cls
@@ -250,24 +259,29 @@ class object_detection:
         for i, class_id in enumerate(class_ids):
             confidence = confidences[i].item()
             if confidence < confidence_threshold:
-                continue  # skip low-confidence detections
+                continue
 
             class_name = class_id_to_name[int(class_id)]
             x1, y1, x2, y2 = boxes[i]
 
-            x_center = (x1 + x2) / 2
-            y_center = (y1 + y2) / 2
-            width = x2 - x1
-            height = y2 - y1
+            # Compute center as integers
+            center_x = int(((x1 + x2) / 2).item())
+            center_y = int(((y1 + y2) / 2).item())
 
-            objects_data.append({
-                "class": class_name,
-                "center": (x_center.item(), y_center.item()),
-                "box_width": width.item(),
-                "box_height": height.item(),
-                "confidence": confidence
+            # Get class_id from COCO dictionary
+            name_to_id = {v: k for k, v in self.coco_classes.items()}
+            class_id_int = name_to_id[class_name]
+
+            detections.append({
+                "class_id": class_id_int,
+                "box_x": center_x,
+                "box_y": center_y,
+                "confidence": round(confidence, 3),
+                "processing_time": round(time.time() - start_time, 3),
+                "frame_id": frame_count,
+                "status": "success"
             })
 
-        return objects_data
+        return {"objects": detections}
 
 
