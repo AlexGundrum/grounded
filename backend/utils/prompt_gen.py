@@ -66,7 +66,7 @@ from openai import OpenAI
 
 
 # def tes_openai(obj_list: list, step: int):
-#     client = OpenAI(api_key="placeholder")
+#     client = OpenAI()
 #     prompt=f""""
 #         You are a calm, supportive Grounding Assistant. 
 #         Your only task is to guide the user through the 5-4-3-2-1 Grounding Technique. 
@@ -122,7 +122,7 @@ import time
 from openai import OpenAI
 
 def create_prompt(obj_list: list, step: int):
-    client = OpenAI(api_key="placeholder")
+    client = OpenAI()
     flat_props = [prop for _, _, props in obj_list for prop in props]
     chosen_attr = random.choice(flat_props) if flat_props else None
 
