@@ -44,6 +44,10 @@ class object_detection:
             'handbag', 'suitcase', 'potted plant', 'tree', 'flower'
         }
     
+    def apply_object_detection(self,image_path):
+        results = self.model(image_path) # results type = ultralytics.engine.results.Results
+        return results
+    
     def extract_dominant_color(self, image: np.ndarray, bbox: List[int]) -> str:
         """
         Extract the dominant color from a bounding box region.
@@ -228,40 +232,31 @@ class object_detection:
             }
     
     
-    def count_objects_from_results(self, result_obj):
+    def get_objects_from_results_for_kori(self, result_obj, confidence_threshold: float = 0.5):
         """
         Extracts detected objects with details:
         - class name
         - bounding box center (x, y)
         - bounding box width and height
-
-        Args:
-            result_obj: YOLOv8 Results object (results[0] from model inference).
-
-        Returns:
-            A list of dictionaries, each containing: each entry is the object
-            {
-                "class": str,
-                "center": (float, float),
-                "width": float,
-                "height": float
-            }
+        - filters by confidence threshold
         """
         objects_data = []
 
-        class_id_to_name = result_obj.names               # mapping from ID -> class name {0: person, 1: dog}
-        boxes = result_obj.boxes.xyxy                    # tensor of bounding boxes [x1, y1, x2, y2]
-        class_ids = result_obj.boxes.cls                 # tensor of class IDs
+        class_id_to_name = result_obj.names
+        boxes = result_obj.boxes.xyxy
+        class_ids = result_obj.boxes.cls
+        confidences = result_obj.boxes.conf
 
         for i, class_id in enumerate(class_ids):
+            confidence = confidences[i].item()
+            if confidence < confidence_threshold:
+                continue  # skip low-confidence detections
+
             class_name = class_id_to_name[int(class_id)]
             x1, y1, x2, y2 = boxes[i]
 
-            # Compute center
             x_center = (x1 + x2) / 2
             y_center = (y1 + y2) / 2
-
-            # Compute width and height
             width = x2 - x1
             height = y2 - y1
 
@@ -269,16 +264,10 @@ class object_detection:
                 "class": class_name,
                 "center": (x_center.item(), y_center.item()),
                 "box_width": width.item(),
-                "box_height": height.item()
+                "box_height": height.item(),
+                "confidence": confidence
             })
 
-        confidences = result_obj.boxes.conf
-        CONFIDENCE_THRESHOLD = 0.5
-        objects_data_over_confidence = []     
-        for objects in objects_data:
-            if confidences[i].item()  >= CONFIDENCE_THRESHOLD:
-                objects_data_over_confidence.append(objects)
+        return objects_data
 
-           
-        return objects_data_over_confidence
 
