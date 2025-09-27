@@ -12,7 +12,7 @@ from utils.object_detection import object_detection
 # ZACH IMPORTED THESE FOR "detect_object_data_from_photo()"
 import cv2
 import numpy as np
-from ultralytics import YOLO
+from ultralytics import YOLO #REMOVE THIS FOR SURE
 from fastapi import UploadFile, File
 
 
@@ -407,9 +407,10 @@ async def process_audio_file(file_path: str):
             "audio_data": None,
             "message": "Audio file processing error"
         }
+
 frame_counter = 0
 @app.put("/detection/image_qualities")
-async def detect_object_data_from_photo(file: UploadFile = File(...)):
+async def detect_object_data_from_photo(file: UploadFile = File(...)): #FIXME gonna be given base64 encodign of image, look at process frame above
     global frame_counter
     frame_counter +=1
 
@@ -422,6 +423,7 @@ async def detect_object_data_from_photo(file: UploadFile = File(...)):
     if img is None:
         return {"status": "error", "message": "Invalid image file"}
 
+    #this, down should probably live in object_detection
     # Run YOLO detection
     detector = object_detection(model_name="yolov8n.pt")
     results = detector.apply_object_detection(img)
@@ -455,7 +457,7 @@ async def detect_object_data_from_photo(file: UploadFile = File(...)):
             "frame_id": frame_counter,
             "status": "success"
         })
-    
+    #and here we grab the results from this function in object_detection return results as needed
     return {"objects": detections}
     #file uploaded is an image
 
