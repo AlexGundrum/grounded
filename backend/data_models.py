@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Union
 
 class TextMessageData(BaseModel):
     text: str
@@ -7,7 +7,7 @@ class TextMessageData(BaseModel):
     timestamp: float 
 
 class ImageMessageData(BaseModel):
-    image: str 
+    image: Union[str, bytes]
     heart_rate: float 
     timestamp: float
 

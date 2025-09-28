@@ -281,7 +281,7 @@ class object_detection:
                 "frame_id": frame_count,
                 "status": "success"
             })
-
+        self.last_objects_identified = detections
         return {"objects": detections}
 
 

@@ -113,45 +113,40 @@ async def get_rate_limit_status(request: Request):
     }
 
 
+
+detector = object_detection(model_name="yolov8n.pt")
+frame_counter = 0
+@app.put("/detection/image_qualities")
+async def detect_object_data_from_photo(data: ImageMessageData):
+    global frame_counter
+    frame_counter +=1
+    
+    start_time = time.time()
+    image_string = data.image
+    results = detector.apply_object_detection(image_string) 
+    formatted_results = detector.get_objects_from_results_for_kori(results[0], frame_counter,start_time,confidence_threshold= 0.5) 
+    detector.last_objects_identified = formatted_results
+    return formatted_results
+    # Convert to Kori's desired format
+    
+    #file uploaded is an image
+
+
 @app.post("/upload_image")
 async def process_frame(data: ImageMessageData):
-    pass
-    """
-    Process image frame for object detection and grounding assistance.
-    """
+    print("Raw data:", data.model_dump())
+    print("Raw data:", data.model_dump_json())
+    global frame_counter
+    frame_counter +=1
+    print("starting object detection n logic")
+    start_time = time.time()
     image_string = data.image
-    heart_rate = data.heart_rate
-    timestamp = data.timestamp
-    
-    print(f"Processing image frame...")
-    print(f"Heart Rate: {heart_rate} | Timestamp: {timestamp}")
-    
-    # Run object detection pipeline
-    detection_result = obj_detector.process_image_pipeline(image_string)
-    
-    if detection_result["success"]:
-        detected_objects = detection_result["detected_objects"]
-        total_objects = detection_result["total_objects"]
-        
-        print(f"Detected {total_objects} objects:")
-        for obj in detected_objects:
-            print(f"  - {obj['color']} {obj['class_name']} (confidence: {obj['confidence']:.2f})")
-        
-        return {
-            "status": "success",
-            "detected_objects": detected_objects,
-            "total_objects": total_objects,
-            "message": f"Found {total_objects} grounding-friendly objects in your environment"
-        }
-    else:
-        print(f"Detection failed: {detection_result.get('error', 'Unknown error')}")
-        return {
-            "status": "error",
-            "error": detection_result.get("error", "Object detection failed"),
-            "detected_objects": [],
-            "total_objects": 0,
-            "message": "I'm having trouble seeing your environment clearly. Let's focus on your breathing instead."
-        }
+    results = detector.apply_object_detection(image_string) 
+    formatted_results = detector.get_objects_from_results_for_kori(results[0], frame_counter,start_time,confidence_threshold= 0.5) 
+    detector.last_objects_identified = formatted_results
+    end_time = time.time()
+    print("results from object detection: " + str(formatted_results) + "Took : " + str(end_time - start_time) + " seconds")
+    return formatted_results
 
 com = llm_communication()
 obj_detector = object_detection()
@@ -404,22 +399,7 @@ async def process_audio_file(file_path: str):
             "message": "Audio file processing error"
         }
     
-detector = object_detection(model_name="yolov8n.pt")
-frame_counter = 0
-@app.put("/detection/image_qualities")
-async def detect_object_data_from_photo(data: ImageMessageData):
-    global frame_counter
-    frame_counter +=1
-    
-    start_time = time.time()
-    image_string = data.image
-    results = detector.apply_object_detection(image_string) 
-    formatted_results = detector.get_objects_from_results_for_kori(results[0], frame_counter,start_time,confidence_threshold= 0.5) 
-    detector.last_objects_identified = formatted_results
-    return formatted_results
-    # Convert to Kori's desired format
-    
-    #file uploaded is an image
+
 
 
 
