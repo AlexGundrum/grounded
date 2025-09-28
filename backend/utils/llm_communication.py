@@ -28,7 +28,7 @@ class llm_communication:
             "Take a slow breath in... and a gentle breath out. You're safe here. Everything will be okay. Let's move through this together, step by step.",
 
             # Step 1: See 5 things
-            "Let's start with your surroundings. Look around you and notice five things you can see. From your scene, I notice a few objects: [OD pipeline inserts detections here]. What are five things you can see right now?",
+            "Let's start with your surroundings. Look around you and notice five things you can see. What are five things you can see right now?",
 
             # Step 2: Touch 4 things
             "Now, gently shift your attention to touch. Notice four things you can physically feel—maybe the ground under your feet, the fabric of your clothing, or the surface beneath your hands. What four things can you touch? ",
@@ -111,7 +111,7 @@ class llm_communication:
     # ------------------------
     # Gemini API call (NEW FUNCTION)
     # ------------------------
-    def gemini_prompt(self, prompt: str, model: str = "gemini-2.5-flash", include_history: bool = False) -> str:
+    def gemini_prompt(self, prompt: str, model: str = "gemini-2.5-flash-lite", include_history: bool = False) -> str:
         """
         Query the Gemini API for a response.
         Uses the GOOGLE_API_KEY loaded during initialization.
@@ -256,8 +256,13 @@ Format:
                 detected_objects = od_results if od_results else self._get_scene_objects()
                 
                 if detected_objects:
-                    prompt += "when prompting the user, mention the objects that are in the scene. The objects are: " + ", ".join(detected_objects) + ". MAKE SURE TO SAY SOMETHING LIKE: from your scene I see ___ and then incorporate it into the way you are going to guide them through the grounding technique."
-                #response = self._generate_grounding_response(base_prompt, user_message)
+                    prompt += (
+        "From the detected scene, I see these objects: "
+        + ", ".join(detected_objects)
+        + ". In your response, you MUST name at least one of these objects directly. "
+        "Phrase it naturally, for example: 'From your scene I see [object].' "
+        "Then guide the user through this grounding step using that object."
+    )#response = self._generate_grounding_response(base_prompt, user_message)
                 # response = self.openai_prompt(prompt=prompt)
                 response = self.gemini_prompt(prompt)
                 self._advance_stage()
@@ -269,8 +274,13 @@ Format:
                 #response = self._generate_grounding_response(base_prompt, user_message)
                 #fixme FIXME if this ends up being dumb then delete FIXME true hasn't been tested
                 if detected_objects:
-                    prompt += "when prompting the user, mention the objects that are in the scene. The objects are: " + ", ".join(detected_objects) + ". MAKE SURE TO SAY SOMETHING IF ANY OF THESE OBJECTS RELATE TO THE SENSE YOU ARE PRESCRIBING THEM TO FOCUS ON IN THIS GROUNDING TECHNIQUE: from your scene I see ___ and then incorporate it into the way you are going to guide them through the grounding technique."
-                
+                    prompt += (
+            "From the detected scene, I see these objects: "
+            + ", ".join(detected_objects)
+            + ". In your response, you MUST name at least one of these objects directly "
+            "and tie it to the sense for this step (touch, hear, smell, taste). "
+            "Phrase it naturally, for example: 'From your scene I see [object], and you might notice its [texture/sound/etc.].'"
+        )
                 # response = self.openai_prompt(prompt=prompt)
                 response = self.gemini_prompt(prompt)
                 self._advance_stage()
@@ -355,7 +365,7 @@ Format:
         """Guide the user through a structured breathing exercise."""
         try:
             if justSwitchedIntoThis:
-                response = "FIXME CHANGING TO BREATHING Let's try a simple breathing exercise together. We'll go slowly—inhale, hold, and exhale with me."
+                response = "I hear you. Let’s slow down together with a gentle breathing exercise—inhale, hold, and exhale with me."
                 #FIXME add stat into here...
                 self.current_stage = 0
                 self.log_message(user_message, response, timestamp)
@@ -410,42 +420,22 @@ Rules:
 
 
     def video_procedure(self, user_message, timestamp: float = None, justSwitchedIntoThis: bool = False):
-        """Guide the user through a soothing video suggestion procedure."""
-        try:
-            soothing_videos = [
-                "a quiet forest stream flowing gently",
-                "a calming ocean wave video",
-                "a soft rainfall on leaves",
-                "a fireplace crackling warmly"
-            ]
-
-            if justSwitchedIntoThis:
-                chosen_video = random.choice(soothing_videos)
-                response = f"FIXME CHANGING TO VIDEO I've found something soothing for you—imagine watching {chosen_video}. Let’s let this moment calm your mind."
-                self.log_message(user_message, response, timestamp)
-                return response
-
-            # Prompt the LLM to keep conversation supportive while referencing video soothing
-            prompt = f"""
-You are a calming companion. The user is in the 'video' procedure where we play or describe soothing videos.
-
-User said: "{user_message}"
-
-Rules:
-1. Respond in under 2 supportive sentences.
-2. If the user seems ready, describe a calming video scenario (choose from: {', '.join(soothing_videos)}).
-3. If the user is distressed or off-topic, acknowledge what they said empathetically and gently redirect to the calming video imagery.
             """
-            #fixme FIXME need to coordinate with kori to make sure that we are introducing the video a friend sent not this 
-            # response = self.openai_prompt(prompt=prompt, include_history=True)
-            response = self.gemini_prompt(prompt, include_history=True)
+            Demo video procedure.
+            Will trigger playing a prerecorded video (e.g., from a loved one).
+            """
+            if justSwitchedIntoThis:
+                # FIXME FIXME: Call API to frontend here to play the video (e.g., mom’s soothing video).
+                response = (
+                    "I’ve found something soothing for you. "
+                    "This is a video your mom recorded for moments like this. "
+                    "It will start playing now. You can ask me to play it again anytime by saying hey anchor, play the video again."
+                )
+            self.current_procedure = "grounding"
+
+            # FIXME update later: make this generic (e.g., “a loved one’s video”) instead of hardcoding “mom”.
             self.log_message(user_message, response, timestamp=timestamp)
             return response
-
-        except Exception as e:
-            print(f"Error in video procedure: {e}")
-            return "Let’s bring up a calming scene together—imagine gentle waves on a shore as we reset."
-
 
 
     def check_if_user_wants_switch_procedure(self, user_message: str):
@@ -477,8 +467,6 @@ Rules:
         #func that is called from endpoint, we then direct data toward whatever procedure we're currently in
         wants_to_switch, switch_location = self.check_if_user_wants_switch_procedure(user_message)
         if wants_to_switch:
-            for i in range(10):
-                print(f"WE WANNA SWITCH TO {switch_location}")
             self.current_procedure = switch_location
         
         if self.current_procedure == "breathing":
