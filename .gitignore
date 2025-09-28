@@ -1,4 +1,0 @@
-*.env
-venv/
-.vscode
-yolov8n.pt

@@ -1,0 +1,167 @@
+{
+  "voice": "shimmer",
+  "speed": 0.9,
+  "generated_at": "2025-09-27 19:18:24",
+  "sounds": [
+    {
+      "filename": "im_with_you.mp3",
+      "original_text": "I'm with you",
+      "size_bytes": 16800
+    },
+    {
+      "filename": "deep_breath.mp3",
+      "original_text": "Deep breath",
+      "size_bytes": 14400
+    },
+    {
+      "filename": "im_processing_that.mp3",
+      "original_text": "I'm processing that",
+      "size_bytes": 26880
+    },
+    {
+      "filename": "umm.mp3",
+      "original_text": "Umm",
+      "size_bytes": 11520
+    },
+    {
+      "filename": "alright.mp3",
+      "original_text": "Alright",
+      "size_bytes": 9600
+    },
+    {
+      "filename": "now.mp3",
+      "original_text": "Now",
+      "size_bytes": 11040
+    },
+    {
+      "filename": "breathe_with_me.mp3",
+      "original_text": "Breathe with me",
+      "size_bytes": 19680
+    },
+    {
+      "filename": "youre_safe.mp3",
+      "original_text": "You're safe",
+      "size_bytes": 15360
+    },
+    {
+      "filename": "right.mp3",
+      "original_text": "Right",
+      "size_bytes": 10560
+    },
+    {
+      "filename": "tell_me_more.mp3",
+      "original_text": "Tell me more",
+      "size_bytes": 16800
+    },
+    {
+      "filename": "hmm.mp3",
+      "original_text": "Hmm",
+      "size_bytes": 9600
+    },
+    {
+      "filename": "take_your_time.mp3",
+      "original_text": "Take your time",
+      "size_bytes": 20160
+    },
+    {
+      "filename": "that_makes_sense.mp3",
+      "original_text": "That makes sense",
+      "size_bytes": 23040
+    },
+    {
+      "filename": "i_see.mp3",
+      "original_text": "I see",
+      "size_bytes": 11520
+    },
+    {
+      "filename": "mmm.mp3",
+      "original_text": "Mmm",
+      "size_bytes": 11040
+    },
+    {
+      "filename": "well.mp3",
+      "original_text": "Well",
+      "size_bytes": 11040
+    },
+    {
+      "filename": "quiet_hum.mp3",
+      "original_text": "*quiet hum*",
+      "size_bytes": 12960
+    },
+    {
+      "filename": "soft_breath.mp3",
+      "original_text": "*soft breath*",
+      "size_bytes": 18240
+    },
+    {
+      "filename": "i_hear_you.mp3",
+      "original_text": "I hear you",
+      "size_bytes": 14400
+    },
+    {
+      "filename": "gentle_sigh.mp3",
+      "original_text": "*gentle sigh*",
+      "size_bytes": 17760
+    },
+    {
+      "filename": "one_moment.mp3",
+      "original_text": "One moment",
+      "size_bytes": 13440
+    },
+    {
+      "filename": "im_listening.mp3",
+      "original_text": "I'm listening",
+      "size_bytes": 17760
+    },
+    {
+      "filename": "so.mp3",
+      "original_text": "So",
+      "size_bytes": 11520
+    },
+    {
+      "filename": "in_and_out.mp3",
+      "original_text": "In and out",
+      "size_bytes": 13440
+    },
+    {
+      "filename": "okay.mp3",
+      "original_text": "Okay",
+      "size_bytes": 11520
+    },
+    {
+      "filename": "yes.mp3",
+      "original_text": "Yes",
+      "size_bytes": 11040
+    },
+    {
+      "filename": "i_understand.mp3",
+      "original_text": "I understand",
+      "size_bytes": 17760
+    },
+    {
+      "filename": "let_me_think.mp3",
+      "original_text": "Let me think",
+      "size_bytes": 16800
+    },
+    {
+      "filename": "im_here.mp3",
+      "original_text": "I'm here",
+      "size_bytes": 11040
+    },
+    {
+      "filename": "go_on.mp3",
+      "original_text": "Go on",
+      "size_bytes": 11040
+    },
+    {
+      "filename": "give_me_a_second.mp3",
+      "original_text": "Give me a second",
+      "size_bytes": 22080
+    },
+    {
+      "filename": "uh-huh.mp3",
+      "original_text": "Uh-huh",
+      "size_bytes": 11520
+    }
+  ]
+}
