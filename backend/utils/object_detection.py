@@ -46,10 +46,11 @@ class object_detection:
         }
     
         self.last_objects_identified = None
-    def apply_object_detection(self,image_str: str): #handles image casting and gets result obj
+    
+    def apply_object_detection(self, image_str: str): #handles image casting and gets result obj
         image_path = str_to_pic(image_str)
         image = cv2.imread(image_path)
-        results = self.model(image_str) # results type = ultralytics.engine.results.Results
+        results = self.model(image) # results type = ultralytics.engine.results.Results
         return results
     
     def extract_dominant_color(self, image: np.ndarray, bbox: List[int]) -> str:

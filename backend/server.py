@@ -134,8 +134,8 @@ async def detect_object_data_from_photo(data: ImageMessageData):
 
 @app.post("/upload_image")
 async def process_frame(data: ImageMessageData):
-    print("Raw data:", data.model_dump())
-    print("Raw data:", data.model_dump_json())
+    #print("Raw data:", data.model_dump())
+    #print("Raw data:", data.model_dump_json())
     global frame_counter
     frame_counter +=1
     print("starting object detection n logic")
@@ -145,7 +145,7 @@ async def process_frame(data: ImageMessageData):
     formatted_results = detector.get_objects_from_results_for_kori(results[0], frame_counter,start_time,confidence_threshold= 0.5) 
     detector.last_objects_identified = formatted_results
     end_time = time.time()
-    print("results from object detection: " + str(formatted_results) + "Took : " + str(end_time - start_time) + " seconds")
+    print("results from object detection: " + str(results) + "  zach's formatted restults: " +  str(formatted_results)   +           " and Took : " + str(end_time - start_time) + " seconds")
     return formatted_results
 
 com = llm_communication()
