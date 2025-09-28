@@ -5,7 +5,6 @@ from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from openai import OpenAI
 from dotenv import load_dotenv
-
 import google.generativeai as genai
 load_dotenv()
 # Load keys
@@ -145,7 +144,7 @@ class llm_communication:
     # ------------------------
     # Grounding Exercise Pipeline
     # ------------------------
-    def process_grounding_exercise(self, user_message: str, timestamp: float = None) -> str:
+    def process_grounding_exercise(self, user_message: str, timestamp: float = None, od_results: List[str] = None) -> str:
         """Process user input through the grounding exercise pipeline."""
         try:
             
@@ -156,25 +155,6 @@ class llm_communication:
             if self.current_stage != 0:
                 last_llm_message = self.grounding_prompts[self.current_stage - 1]
             current_step_message = self.grounding_prompts[self.current_stage]
-
-            '''og prompt = f"""You are a calm therapist guiding a user through a 5-4-3-2-1 grounding exercise for anxiety. 
-You must decide whether the user is ready to move on to the next step, or whether they want to stay in this step and talk more.
-
-Here is the conversation state:
-
-- Last grounding step: "{last_llm_message}"
-- User’s reply: "{user_message}"
-- Current grounding step prompt: "{current_step_message}"
-
-Rules:
-1. If the user clearly followed the instruction (e.g., listed the correct number of things, or engaged with the exercise), respond with "READY:" and THEN directly provide the **next step’s grounding prompt** in a calm, natural way.
-2. If the user seems distracted, panicked, or asking for repetition, respond with "HOLD:" and THEN provide a short, empathetic response that responds to their concerns and tries to kindly and patiently be there for them.
-3. Your response after "READY:" or "HOLD:" must always be no more than 2 calm, supportive sentences.
-
-Format:
-- Start with either "READY:" or "HOLD:" (nothing else before it).
-- After that, include your message for the user.
-"""'''
             
             prompt = f"""You are a calm, caring therapist guiding a user through a 5-4-3-2-1 grounding exercise for anxiety.  
 Your role is not just to move through steps, but to be a supportive companion who listens patiently and helps the user feel understood.  
@@ -220,24 +200,7 @@ Format:
 - Start with "READY:" (nothing else before it).  
 - After that, include your gentle transition + the {current_step_message}.  
 """
-                '''og prompt = f"""You are a calm and supportive guide.  
-The user may have been chatting off-topic or staying in the current step for a while, but now you must gently and smoothly segue them forward.  
-
-Here is the conversation state:
-
-- Last assistant message: "{last_llm_message}"
-- User’s reply: "{user_message}"
-- Current step message: "{current_step_message}"
-
-Rules:
-1. Always respond with "READY:" followed by a short, natural, and gentle transition that acknowledges the conversation and calmly brings the user back on track.
-2. After your gentle transition, immediately provide the {current_step_message}.
-3. Your transition + step delivery must feel conversational, not robotic or scripted, and should not exceed 2 sentences before moving into the step.
-
-Format:
-- Start with "READY:" (nothing else before it).
-- After that, include your gentle transition + the {current_step_message}.
-"""'''
+                
             
             # Safety clamp on stage index
             if self.current_stage < 0:
@@ -254,13 +217,11 @@ Format:
                 self._advance_stage()
 
             elif self.current_stage == 1:  # Visual step with OD pipeline
-                detected_objects = self._get_scene_objects()  # TODO: hook into OD service
+                # Use passed OD results or fallback to mock data
+                detected_objects = od_results if od_results else self._get_scene_objects()
                 #FIXME make OD be joined
                 if detected_objects:
-                    base_prompt = base_prompt.replace(
-                        "[OD pipeline inserts detections here]",
-                        ", ".join(detected_objects)
-                    )
+                    prompt += "when prompting the user, mention the objects that are in the scene. The objects are: " + ", ".join(detected_objects) + ". MAKE SURE TO SAY SOMETHING LIKE: from your scene I see ___ and then incorporate it into the way you are going to guide them through the grounding technique."
                 #response = self._generate_grounding_response(base_prompt, user_message)
                 response = self.openai_prompt(prompt=prompt)
                 self._advance_stage()
@@ -328,9 +289,8 @@ Format:
         self.current_stage = 0
 
     def _get_scene_objects(self) -> List[str]:
-        """Hook into OD pipeline to return scene objects as a list of strings."""
-        # FIXME: Replace with actual OD service call
-        return ["lamp", "book", "chair"]
+        """Fallback method for when no OD results are provided."""
+        return ["johnson your friend", "book", "chair"]  # Mock data for testing
 
     def get_current_grounding_step(self) -> int:
         """Get the current grounding exercise step."""

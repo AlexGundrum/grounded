@@ -6,7 +6,7 @@ import time
 from typing import Dict, Tuple
 #from utils import * 
 #from utils import str_to_pic
-from utils import llm_communication
+from utils.llm_communication import llm_communication
 
 from utils.object_detection import object_detection
 
@@ -24,6 +24,9 @@ app = FastAPI()
 # Track last request timestamps by client (using IP or session)
 last_request_times: Dict[str, float] = {}
 RATE_LIMIT_SECONDS = 5  # Minimum seconds between requests (adjust as needed)
+
+# Cumulative object detection results - accumulates all objects seen over time
+cumulative_detected_objects: set = set()
 
 def get_client_id(request) -> str:
     """
@@ -116,6 +119,22 @@ async def get_rate_limit_status(request: Request):
 
 detector = object_detection(model_name="yolov8n.pt")
 frame_counter = 0
+
+def get_last_objects_identified():
+    return detector.last_objects_identified
+
+def add_to_cumulative_objects(object_names: list):
+    """Add new object names to the cumulative detected objects set."""
+    global cumulative_detected_objects
+    for obj_name in object_names:
+        if obj_name and obj_name.strip():  # Only add non-empty strings
+            cumulative_detected_objects.add(obj_name.strip().lower())
+
+def get_cumulative_objects():
+    """Get all objects that have been detected over time."""
+    global cumulative_detected_objects
+    return list(cumulative_detected_objects)
+
 @app.put("/detection/image_qualities")
 async def detect_object_data_from_photo(data: ImageMessageData):
     global frame_counter
@@ -138,14 +157,57 @@ async def process_frame(data: ImageMessageData):
     #print("Raw data:", data.model_dump_json())
     global frame_counter
     frame_counter +=1
-    print("starting object detection n logic")
+    #print("starting object detection n logic")
     start_time = time.time()
     image_string = data.image
+    
+    # DEBUG: Save received image for inspection
+    try:
+        import base64
+        import os
+        from datetime import datetime
+        
+        # Create debug directory if it doesn't exist
+        debug_dir = "debug_images"
+        if not os.path.exists(debug_dir):
+            os.makedirs(debug_dir)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{debug_dir}/received_image_{frame_counter}_{timestamp}.jpg"
+        
+        # Decode and save the image
+        image_data = base64.b64decode(image_string)
+        with open(filename, 'wb') as f:
+            f.write(image_data)
+        
+        #print(f"DEBUG: Saved received image to {filename}")
+        #print(f"DEBUG: Image size: {len(image_data)} bytes")
+        
+    except Exception as e:
+        print(f"DEBUG: Failed to save image: {e}")
+        print(f"DEBUG: Image string length: {len(image_string)}")
+        print(f"DEBUG: Image string preview: {image_string[:100]}...")
+    
     results = detector.apply_object_detection(image_string) 
     formatted_results = detector.get_objects_from_results_for_kori(results[0], frame_counter,start_time,confidence_threshold= 0.5) 
-    detector.last_objects_identified = formatted_results
+    if formatted_results is not None:
+        detector.last_objects_identified = formatted_results
+        
+        # Extract object names and add to cumulative list
+        object_names = []
+        for obj in formatted_results:
+            if isinstance(obj, dict) and 'object' in obj:
+                object_names.append(obj['object'])
+            elif isinstance(obj, str):
+                object_names.append(obj)
+        
+        # Add new objects to cumulative list
+        add_to_cumulative_objects(object_names)
+        print(f"Cumulative objects so far: {get_cumulative_objects()}")
+
     end_time = time.time()
-    print("results from object detection: " + str(results) + "  zach's formatted restults: " +  str(formatted_results)   +           " and Took : " + str(end_time - start_time) + " seconds")
+    #print("  zach's formatted restults: " +  str(formatted_results) + " and Took : " + str(end_time - start_time) + " seconds")
     return formatted_results
 
 com = llm_communication()
@@ -167,8 +229,12 @@ async def process_text(data: TextMessageData, client_id: str = Depends(rate_limi
     #response = com.enhanced_message_pipeline(text, timestamp)
     
 
+    # Get all cumulative object detection results for grounding exercise
+    od_object_names = get_cumulative_objects()
+    print(f"Using cumulative objects for grounding: {od_object_names}")
+    
     #FIXME ALEX if there is a problem it is likely due to this lazy interchange im about to do 
-    response = com.process_grounding_exercise(text, timestamp)
+    response = com.process_grounding_exercise(text, timestamp, od_results=od_object_names)
 
 
 
@@ -398,7 +464,76 @@ async def process_audio_file(file_path: str):
             "audio_data": None,
             "message": "Audio file processing error"
         }
-    
+
+@app.post("/grounding_with_image")
+async def grounding_with_image(data: ImageMessageData):
+    """
+    Process image for grounding exercise with object detection integration.
+    This endpoint combines object detection with grounding exercise.
+    """
+    try:
+        print("Starting grounding exercise with image...")
+        start_time = time.time()
+        
+        # Process image through object detection
+        image_string = data.image
+        results = detector.apply_object_detection(image_string)
+        formatted_results = detector.get_objects_from_results_for_kori(
+            results[0], 
+            frame_counter, 
+            start_time, 
+            confidence_threshold=0.5
+        )
+        
+        # Store results for grounding exercise
+        detector.last_objects_identified = formatted_results
+        
+        # Extract object names and add to cumulative list
+        object_names = []
+        if formatted_results and isinstance(formatted_results, list):
+            for obj in formatted_results:
+                if isinstance(obj, dict) and 'object' in obj:
+                    object_names.append(obj['object'])
+                elif isinstance(obj, str):
+                    object_names.append(obj)
+        
+        # Add new objects to cumulative list
+        add_to_cumulative_objects(object_names)
+        
+        # Use cumulative objects for grounding exercise
+        cumulative_objects = get_cumulative_objects()
+        print(f"Using cumulative objects for grounding: {cumulative_objects}")
+        
+        # Process through grounding exercise with cumulative OD results
+        response = com.process_grounding_exercise(
+            user_message="I can see my environment now",
+            timestamp=data.timestamp,
+            od_results=cumulative_objects
+        )
+        
+        # Convert to speech
+        tts_result = tts_service.create_grounding_audio(response)
+        
+        end_time = time.time()
+        print(f"Grounding with image completed in {end_time - start_time:.2f} seconds")
+        
+        return {
+            "status": "success",
+            "message": response,
+            "audio_base64": tts_result["audio_data"] if tts_result["success"] else None,
+            "detected_objects": cumulative_objects,
+            "new_objects_this_frame": object_names,
+            "processing_time": end_time - start_time
+        }
+        
+    except Exception as e:
+        print(f"Error in grounding with image: {e}")
+        return {
+            "status": "error",
+            "message": "I'm here to help you through this. Let's take a gentle breath together and try again.",
+            "audio_base64": None,
+            "error": str(e)
+        }
 
 
 
