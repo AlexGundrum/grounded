@@ -7,16 +7,8 @@ from typing import Dict, Tuple
 #from utils import * 
 #from utils import str_to_pic
 from utils.llm_communication import llm_communication
-
 from utils.object_detection import object_detection
-
-
-
-
-
 from services.text_to_speech import text_to_speech
-
-
 
 app = FastAPI()
 
@@ -254,123 +246,6 @@ async def process_text(data: TextMessageData, client_id: str = Depends(rate_limi
             "message": response,
             "audio_base64": None
         }
-
-
-@app.post("/tts/convert")
-async def convert_text_to_speech(data: TTSRequestData):
-    """
-    Convert text to speech using OpenAI's TTS API and return base64 audio.
-    """
-    try:
-        text = data.text
-        voice = data.voice
-        format = data.format
-        
-        print(f"Converting text to speech: '{text[:50]}...'")
-        if voice:
-            print(f"Using voice: {voice}")
-        
-        # Convert text to audio
-        result = tts_service.process_text_pipeline(text, voice=voice)
-        
-        if result["success"]:
-            return {
-                "status": "success",
-                "audio_data": result["audio_data"],
-                "voice_used": result["voice_used"],
-                "voice_description": result["voice_description"],
-                "text_length": result["text_length"],
-                "format": result["format"],
-                "message": "Text successfully converted to speech"
-            }
-        else:
-            return {
-                "status": "error",
-                "error": result["error"],
-                "audio_data": None,
-                "message": "Failed to convert text to speech"
-            }
-            
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "audio_data": None,
-            "message": "TTS service error"
-        }
-
-@app.post("/grounding_with_image")
-async def grounding_with_image(data: ImageMessageData):
-    """
-    Process image for grounding exercise with object detection integration.
-    This endpoint combines object detection with grounding exercise.
-    """
-    try:
-        print("Starting grounding exercise with image...")
-        start_time = time.time()
-        
-        # Process image through object detection
-        image_string = data.image
-        results = detector.apply_object_detection(image_string)
-        formatted_results = detector.get_objects_from_results_for_kori(
-            results[0], 
-            frame_counter, 
-            start_time, 
-            confidence_threshold=0.5
-        )
-        
-        # Store results for grounding exercise
-        detector.last_objects_identified = formatted_results
-        
-        # Extract object names and add to cumulative list
-        object_names = []
-        if formatted_results and isinstance(formatted_results, list):
-            for obj in formatted_results:
-                if isinstance(obj, dict) and 'object' in obj:
-                    object_names.append(obj['object'])
-                elif isinstance(obj, str):
-                    object_names.append(obj)
-        
-        # Add new objects to cumulative list
-        add_to_cumulative_objects(object_names)
-        
-        # Use cumulative objects for grounding exercise
-        cumulative_objects = get_cumulative_objects()
-        print(f"Using cumulative objects for grounding: {cumulative_objects}")
-        
-        # Process through grounding exercise with cumulative OD results
-        response = com.process_grounding_exercise(
-            user_message="I can see my environment now",
-            timestamp=data.timestamp,
-            od_results=cumulative_objects
-        )
-        
-        # Convert to speech
-        tts_result = tts_service.create_grounding_audio(response)
-        
-        end_time = time.time()
-        print(f"Grounding with image completed in {end_time - start_time:.2f} seconds")
-        
-        return {
-            "status": "success",
-            "message": response,
-            "audio_base64": tts_result["audio_data"] if tts_result["success"] else None,
-            "detected_objects": cumulative_objects,
-            "new_objects_this_frame": object_names,
-            "processing_time": end_time - start_time
-        }
-        
-    except Exception as e:
-        print(f"Error in grounding with image: {e}")
-        return {
-            "status": "error",
-            "message": "I'm here to help you through this. Let's take a gentle breath together and try again.",
-            "audio_base64": None,
-            "error": str(e)
-        }
-
-
-
 
 # ----------------------------
 # Run server
