@@ -20,6 +20,8 @@ class llm_communication:
         self.current_stage = 0
         self.off_topic_count = 0
         self.max_off_topic = 2
+
+        self.current_procedure = "grounding" #grounding, breathing, videos
         # Grounding exercise prompts
         self.grounding_prompts = [
             # Calm Opener
@@ -144,7 +146,7 @@ class llm_communication:
     # ------------------------
     # Grounding Exercise Pipeline
     # ------------------------
-    def process_grounding_exercise(self, user_message: str, timestamp: float = None, od_results: List[str] = None) -> str:
+    def process_grounding_exercise(self, user_message: str, timestamp: float = None, od_results: List[str] = None,  justSwitchedIntoThis = False) -> str:
         """Process user input through the grounding exercise pipeline."""
         try:
             
@@ -208,12 +210,13 @@ Format:
             elif self.current_stage >= len(self.grounding_prompts):
                 self.current_stage = len(self.grounding_prompts) - 1
             
-            base_prompt = self.grounding_prompts[self.current_stage]
+            #base_prompt = self.grounding_prompts[self.current_stage]
 
             # --- Stage Logic ---
             if self.current_stage == 0:  # Calm opener
                 #FIXME make intro logic here alex
-                response = self._generate_grounding_response(base_prompt, user_message)
+                #Take a slow breath in... and a gentle breath out. You're safe here. Everything will be okay. Let's move through this together, step by step.
+                response = self._generate_grounding_response(prompt, user_message)
                 self._advance_stage()
 
             elif self.current_stage == 1:  # Visual step with OD pipeline
@@ -228,6 +231,10 @@ Format:
 
             elif 2 <= self.current_stage <= 5:  # Touch, Hear, Smell, Taste
                 #response = self._generate_grounding_response(base_prompt, user_message)
+                #fixme FIXME if this ends up being dumb then delete
+                if detected_objects:
+                    prompt += "when prompting the user, mention the objects that are in the scene. The objects are: " + ", ".join(detected_objects) + ". MAKE SURE TO SAY SOMETHING IF ANY OF THESE OBJECTS RELATE TO THE SENSE YOU ARE PRESCRIBING THEM TO FOCUS ON IN THIS GROUNDING TECHNIQUE: from your scene I see ___ and then incorporate it into the way you are going to guide them through the grounding technique."
+                
                 response = self.openai_prompt(prompt=prompt)
                 self._advance_stage()
 
@@ -297,7 +304,143 @@ Format:
         return self.current_stage
 
     def get_grounding_step_description(self) -> str:
+
         """Get description of current grounding step."""
         if 0 <= self.current_stage < len(self.grounding_prompts):
             return self.grounding_prompts[self.current_stage]
         return "Grounding exercise complete."
+
+    def breathing_procedure(self, user_message, timestamp: float = None, justSwitchedIntoThis: bool = False):
+        """Guide the user through a structured breathing exercise."""
+        try:
+            if justSwitchedIntoThis:
+                response = "FIXME CHANGING TO BREATHING Let's try a simple breathing exercise together. We'll go slowly—inhale, hold, and exhale with me."
+                self.current_stage = 0
+                self.log_message(user_message, response, timestamp)
+                return response
+
+            breathing_prompts = [
+                "Breathe in gently through your nose for a slow count of 4.",
+                "Now hold your breath for a count of 4.",
+                "Exhale slowly through your mouth for a count of 6.",
+                "Pause for a moment and notice the calm settling in your body.",
+                "Let's repeat this cycle together if you’d like."
+            ]
+
+            if self.current_stage < 0:
+                self.current_stage = 0
+            elif self.current_stage >= len(breathing_prompts):
+                self.current_stage = len(breathing_prompts) - 1
+
+            current_step_message = breathing_prompts[self.current_stage]
+
+            # Simple acknowledgment + step progression
+            prompt = f"""
+You are a calm, supportive therapist guiding a user through a breathing exercise for anxiety relief.
+
+User said: "{user_message}"
+Current step: "{current_step_message}"
+
+Rules:
+1. Keep your response under 2 sentences.
+2. If the user is following along, gently move to the next step with reassurance.
+3. If the user is panicked, off-topic, or needs patience, pause here and reassure them instead of pushing forward.
+            """
+
+            response = self.openai_prompt(prompt=prompt, include_history=True)
+
+            # Advance breathing stage unless user seems to want to pause
+            if any(word in user_message.lower() for word in ["stop", "wait", "hold", "pause"]):
+                pass  # stay on current step
+            else:
+                self.current_stage += 1
+                if self.current_stage >= len(breathing_prompts):
+                    self.current_stage = len(breathing_prompts) - 1
+
+            self.log_message(user_message, response, timestamp=timestamp)
+            return response
+
+        except Exception as e:
+            print(f"Error in breathing procedure: {e}")
+            return "Let’s take a calm breath together and try again. You’re doing great."
+
+
+
+    def video_procedure(self, user_message, timestamp: float = None, justSwitchedIntoThis: bool = False):
+        """Guide the user through a soothing video suggestion procedure."""
+        try:
+            soothing_videos = [
+                "a quiet forest stream flowing gently",
+                "a calming ocean wave video",
+                "a soft rainfall on leaves",
+                "a fireplace crackling warmly"
+            ]
+
+            if justSwitchedIntoThis:
+                chosen_video = random.choice(soothing_videos)
+                response = f"FIXME CHANGING TO VIDEO I've found something soothing for you—imagine watching {chosen_video}. Let’s let this moment calm your mind."
+                self.log_message(user_message, response, timestamp)
+                return response
+
+            # Prompt the LLM to keep conversation supportive while referencing video soothing
+            prompt = f"""
+You are a calming companion. The user is in the 'video' procedure where we play or describe soothing videos.
+
+User said: "{user_message}"
+
+Rules:
+1. Respond in under 2 supportive sentences.
+2. If the user seems ready, describe a calming video scenario (choose from: {', '.join(soothing_videos)}).
+3. If the user is distressed or off-topic, acknowledge what they said empathetically and gently redirect to the calming video imagery.
+            """
+
+            response = self.openai_prompt(prompt=prompt, include_history=True)
+            self.log_message(user_message, response, timestamp=timestamp)
+            return response
+
+        except Exception as e:
+            print(f"Error in video procedure: {e}")
+            return "Let’s bring up a calming scene together—imagine gentle waves on a shore as we reset."
+
+
+
+    def check_if_user_wants_switch_procedure(self, user_message: str):
+        """
+        Returns [bool, str] where:
+        - bool indicates if the user wants to switch
+        - str indicates which procedure to switch to ("breathing", "video", "grounding")
+        """
+        user_message = user_message.lower()
+
+        # check breathing
+        if "anchor" in user_message and any(word in user_message for word in ["breath", "breathe", "breathing", "hyperventilating", "inhale", "exhale", "lungs", "can’t breathe", "hard to breathe", "catch my breath", "air", "oxygen"]):
+            return [True, "breathing"]
+
+        # check video
+        if "anchor" in user_message and any(word in user_message for word in ["video", "watch", "play", "show me", "clip", "youtube", "calm video", "soothing video", "relaxing video"]):
+            return [True, "video"]
+
+        # check grounding
+        if "anchor" in user_message and any(word in user_message for word in ["grounding", "ground", "focus", "present", "panic", "calm down"]):
+            return [True, "grounding"]
+
+        # default: no switch
+        return [False, ""]
+
+    
+
+    def starting_point(self, user_message: str, timestamp: float = None, od_results: List[str] = None):
+        #func that is called from endpoint, we then direct data toward whatever procedure we're currently in
+        wants_to_switch, switch_location = self.check_if_user_wants_switch_procedure(user_message)
+        if wants_to_switch:
+            for i in range(10):
+                print(f"WE WANNA SWITCH TO {switch_location}")
+            self.current_procedure = switch_location
+        
+        if self.current_procedure == "breathing":
+            return self.breathing_procedure(user_message, timestamp, justSwitchedIntoThis=wants_to_switch)
+        elif self.current_procedure == "video":
+            return self.video_procedure(user_message, timestamp, justSwitchedIntoThis=wants_to_switch)
+        else:
+            return self.process_grounding_exercise(user_message, timestamp, od_results, justSwitchedIntoThis=wants_to_switch)
+            #default is grounding procedure
