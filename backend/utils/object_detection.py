@@ -183,6 +183,7 @@ class object_detection:
 
         return {"objects": detections}
     
+    # tom added color extraction here
 
     def save_snippets(self,image_path, detections, output_dir="snippets"):
         """

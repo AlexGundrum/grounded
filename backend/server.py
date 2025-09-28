@@ -407,10 +407,11 @@ async def process_audio_file(file_path: str):
 detector = object_detection(model_name="yolov8n.pt")
 frame_counter = 0
 @app.put("/detection/image_qualities")
+
+# tom added color extraction here
 async def detect_object_data_from_photo(data: ImageMessageData):
     global frame_counter
     frame_counter +=1
-    
     start_time = time.time()
     image_string = data.image
     results = detector.apply_object_detection(image_string) 
