@@ -10,7 +10,7 @@ load_dotenv()
 # Load keys
 OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-genai.api_key = os.getenv("GOOGLE_API_KEY")
+genai.api_key = os.getenv("GEMINI_API_KEY")
 
 class llm_communication:
     def __init__(self, message_retention_minutes: int = 30):
@@ -102,10 +102,39 @@ class llm_communication:
         messages.append({"role": "user", "content": prompt})
         
         response = self.client.chat.completions.create(
-            model=model,
+        model=model,
             messages=messages
         )
         return response.choices[0].message.content
+
+
+    # ------------------------
+    # Gemini API call (NEW FUNCTION)
+    # ------------------------
+    def gemini_prompt(self, prompt: str, model: str = "gemini-2.5-flash", include_history: bool = False) -> str:
+        """
+        Query the Gemini API for a response.
+        Uses the GOOGLE_API_KEY loaded during initialization.
+        """
+        # Include conversation history if requested
+        if include_history:
+            context = self.format_conversation_for_context()
+            if context:
+                # Prepend the context to the prompt
+                prompt = f"{context}\n\n{prompt}"
+        
+        # Add system instruction to the prompt
+        system_instruction = "You are a calm, grounding therapist helping with anxiety. Respond in two sentences or less."
+        full_prompt = f"{system_instruction}\n\n{prompt}"
+        
+        try:
+            # Call the Gemini API using the correct syntax
+            response = genai.GenerativeModel(model).generate_content(full_prompt)
+            return response.text
+        
+        except Exception as e:
+            print(f"Gemini API Error: {e}")
+            return "I apologize, but I couldn't connect to the AI right now. Let's take a slow breath together."
 
     # ------------------------
     # Enhanced Communication Pipeline
@@ -136,18 +165,21 @@ class llm_communication:
             """
         
         # Generate response with history context
-        response = self.openai_prompt(enhanced_prompt, include_history=True)
+        # response = self.openai_prompt(enhanced_prompt, include_history=True)
+        response = self.gemini_prompt(enhanced_prompt, include_history=True)
         
         # Log the conversation exchange
         self.log_message(user_message, response, timestamp=timestamp)
         
         return response
-    
+
     # ------------------------
     # Grounding Exercise Pipeline
     # ------------------------
     def process_grounding_exercise(self, user_message: str, timestamp: float = None, od_results: List[str] = None,  justSwitchedIntoThis = False) -> str:
         """Process user input through the grounding exercise pipeline."""
+        if justSwitchedIntoThis:
+            self.current_procedure = 0
         try:
             
             #
@@ -222,25 +254,31 @@ Format:
             elif self.current_stage == 1:  # Visual step with OD pipeline
                 # Use passed OD results or fallback to mock data
                 detected_objects = od_results if od_results else self._get_scene_objects()
-                #FIXME make OD be joined
+                
                 if detected_objects:
                     prompt += "when prompting the user, mention the objects that are in the scene. The objects are: " + ", ".join(detected_objects) + ". MAKE SURE TO SAY SOMETHING LIKE: from your scene I see ___ and then incorporate it into the way you are going to guide them through the grounding technique."
                 #response = self._generate_grounding_response(base_prompt, user_message)
-                response = self.openai_prompt(prompt=prompt)
+                # response = self.openai_prompt(prompt=prompt)
+                response = self.gemini_prompt(prompt)
                 self._advance_stage()
 
             elif 2 <= self.current_stage <= 5:  # Touch, Hear, Smell, Taste
+                # Use passed OD results or fallback to mock data
+                detected_objects = od_results if od_results else self._get_scene_objects()
+                
                 #response = self._generate_grounding_response(base_prompt, user_message)
-                #fixme FIXME if this ends up being dumb then delete
+                #fixme FIXME if this ends up being dumb then delete FIXME true hasn't been tested
                 if detected_objects:
                     prompt += "when prompting the user, mention the objects that are in the scene. The objects are: " + ", ".join(detected_objects) + ". MAKE SURE TO SAY SOMETHING IF ANY OF THESE OBJECTS RELATE TO THE SENSE YOU ARE PRESCRIBING THEM TO FOCUS ON IN THIS GROUNDING TECHNIQUE: from your scene I see ___ and then incorporate it into the way you are going to guide them through the grounding technique."
                 
-                response = self.openai_prompt(prompt=prompt)
+                # response = self.openai_prompt(prompt=prompt)
+                response = self.gemini_prompt(prompt)
                 self._advance_stage()
 
             elif self.current_stage == 6:  # Closure
                 #response = self._generate_grounding_response(base_prompt, user_message)
-                response = self.openai_prompt(prompt=prompt)
+                # response = self.openai_prompt(prompt=prompt)
+                response = self.gemini_prompt(prompt)
                 if any(word in user_message.lower() for word in ["continue", "again", "more", "another", "repeat"]):
                     self.reset_exercise()
                     response += " Let's start fresh with another grounding exercise."
@@ -255,6 +293,7 @@ Format:
                 
             if response.startswith("READY:"):
                 response = response[6:]
+                self._advance_stage()
                 self.off_topic_count = 0
             
             # Log interaction
@@ -269,7 +308,8 @@ Format:
         """Generate a grounding response using the base prompt + user input."""
         if not user_message.strip():
             # Just use the base prompt if no user input
-            return self.openai_prompt(base_prompt, include_history=True)
+            # return self.openai_prompt(base_prompt, include_history=True)
+            return self.gemini_prompt(base_prompt, include_history=True)
 
         # Short acknowledgment to avoid repetition
         ack_templates = [
@@ -283,7 +323,8 @@ Format:
 
         # Combine acknowledgment with grounding step
         prompt = f"{base_prompt}\n\nThe user said: '{user_message}'. {ack}Guide them according to the grounding step."
-        return self.openai_prompt(prompt, include_history=True)
+        # return self.openai_prompt(prompt, include_history=True)
+        return self.gemini_prompt(prompt, include_history=True)
 
     def _advance_stage(self):
         """Advance to the next grounding stage, clamping to closure."""
@@ -315,6 +356,7 @@ Format:
         try:
             if justSwitchedIntoThis:
                 response = "FIXME CHANGING TO BREATHING Let's try a simple breathing exercise together. We'll go slowly—inhale, hold, and exhale with me."
+                #FIXME add stat into here...
                 self.current_stage = 0
                 self.log_message(user_message, response, timestamp)
                 return response
@@ -347,7 +389,8 @@ Rules:
 3. If the user is panicked, off-topic, or needs patience, pause here and reassure them instead of pushing forward.
             """
 
-            response = self.openai_prompt(prompt=prompt, include_history=True)
+            # response = self.openai_prompt(prompt=prompt, include_history=True)
+            response = self.gemini_prompt(prompt, include_history=True)
 
             # Advance breathing stage unless user seems to want to pause
             if any(word in user_message.lower() for word in ["stop", "wait", "hold", "pause"]):
@@ -393,8 +436,9 @@ Rules:
 2. If the user seems ready, describe a calming video scenario (choose from: {', '.join(soothing_videos)}).
 3. If the user is distressed or off-topic, acknowledge what they said empathetically and gently redirect to the calming video imagery.
             """
-
-            response = self.openai_prompt(prompt=prompt, include_history=True)
+            #fixme FIXME need to coordinate with kori to make sure that we are introducing the video a friend sent not this 
+            # response = self.openai_prompt(prompt=prompt, include_history=True)
+            response = self.gemini_prompt(prompt, include_history=True)
             self.log_message(user_message, response, timestamp=timestamp)
             return response
 
@@ -414,15 +458,15 @@ Rules:
 
         # check breathing
         if "anchor" in user_message and any(word in user_message for word in ["breath", "breathe", "breathing", "hyperventilating", "inhale", "exhale", "lungs", "can’t breathe", "hard to breathe", "catch my breath", "air", "oxygen"]):
-            return [True, "breathing"]
+            return [(self.current_procedure != "breathing"), "breathing"]
 
         # check video
-        if "anchor" in user_message and any(word in user_message for word in ["video", "watch", "play", "show me", "clip", "youtube", "calm video", "soothing video", "relaxing video"]):
-            return [True, "video"]
+        if "anchor" in user_message and any(word in user_message for word in ["video"]):
+            return [(self.current_procedure != "video"), "video"]
 
         # check grounding
         if "anchor" in user_message and any(word in user_message for word in ["grounding", "ground", "focus", "present", "panic", "calm down"]):
-            return [True, "grounding"]
+            return [(self.current_procedure != "grounding"), "grounding"]
 
         # default: no switch
         return [False, ""]
